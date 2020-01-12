@@ -96,6 +96,6 @@ def dm_default_welcome_message(message):
 babel('hello world abcde')
 #
 print("starting babel-bot instance")
-app.run(host='', port=8080, debug=True)
+app.run(host='localhost', port=8080, debug=True)
 # dm_default_welcome_message("Welcome!")
 # tweet({"status": "hello world3 attachment_url", "attachment_url": "https://twitter.com/andypiper/status/903615884664725505"})
