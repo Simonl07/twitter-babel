@@ -2,22 +2,44 @@ import configparser
 import requests
 import re
 import inflect
+import base64
+import hashlib
+import hmac
+import json
 from bs4 import BeautifulSoup
 from requests_oauthlib import OAuth1Session
 from flask import Flask
+from flask import request
+
 
 
 app = Flask(__name__)
-
-@app.route('/test')
-def hello_world():
-	return 'Hello, World!'
-
-bio = "The babel librarian of Twitter. Unraveling the location of tweets around the world and the messages of curious visitors."
 config = configparser.ConfigParser()
 config.read('credentials.ini')
-
 ord = inflect.engine().ordinal
+
+
+# Twitter webhook challenge
+@app.route('/webhooks/twitter', methods=['GET'])
+def webhook_challenge():
+	# creates HMAC SHA-256 hash from incomming token and your consumer secret
+
+	validation = hmac.new(
+		key=bytes(config['DEFAULT']['oauth_consumer_secrete'], 'utf-8'),
+		msg=bytes(request.args['crc_token'], 'utf-8'),
+		digestmod = hashlib.sha256
+	)
+	digested = base64.b64encode(validation.digest())
+
+	response = {
+		'response_token': 'sha256=' + format(str(digested)[2:-1])
+	}
+
+	print('responding to CRC call: ' + str(response))
+	return json.dumps(response)
+
+
+bio = "The babel librarian of Twitter. Unraveling the location of tweets around the world and the messages of curious visitors."
 
 twitter = OAuth1Session(
 			config['DEFAULT']['oauth_consumer_key'],
