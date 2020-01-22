@@ -14,63 +14,10 @@ import subprocess
 import sys
 from json_stream_parser import load_iter
 
-
-def process_event(event):
-    print(event)
-
-proc = subprocess.Popen(['/bin/bash','autohook.sh'],stdout=subprocess.PIPE,text=True)
-line = ''
-cnt = 0
-while 'Subscribed' not in line and cnt < 10:
-    line = str(proc.stdout.readline())
-    print(line)
-    cnt+=1
-
-buff = ''
-while True:
-    line = proc.stdout.readline()
-    if not line:
-        break
-    buff += line
-
-    try:
-        event = json.loads(buff)
-        buff = ''
-        process_event(event)
-    except json.JSONDecodeError:
-        continue
-
-#while True:  
-    #    line = proc.stdout.readline()
-#    if not line:
-#        break
-#    #the real code does filtering here
-#    print("test:", line.rstrip())
-
 app = Flask(__name__)
 config = configparser.ConfigParser()
 config.read('credentials.ini')
 ord = inflect.engine().ordinal
-
-
-# Twitter webhook challenge
-@app.route('/webhooks/twitter', methods=['GET'])
-def webhook_challenge():
-	# creates HMAC SHA-256 hash from incomming token and your consumer secret
-
-	validation = hmac.new(
-		key=bytes(config['DEFAULT']['oauth_consumer_secrete'], 'utf-8'),
-		msg=bytes(request.args['crc_token'], 'utf-8'),
-		digestmod = hashlib.sha256
-	)
-	digested = base64.b64encode(validation.digest())
-
-	response = {
-		'response_token': 'sha256=' + format(str(digested)[2:-1])
-	}
-
-	print('responding to CRC call: ' + str(response))
-	return json.dumps(response)
 
 
 bio = "The babel librarian of Twitter. Unraveling the location of tweets around the world and the messages of curious visitors."
@@ -82,6 +29,53 @@ twitter = OAuth1Session(
 			resource_owner_secret=config['DEFAULT']['resource_owner_secret']
 		)
 
+
+def send_dm(text, recipient_id):
+	url = 'https://api.twitter.com/1.1/direct_messages/events/new.json'
+	event = {
+		'type': 'message_create',
+		'message_create': {
+			'target': {
+				'recipient_id': recipient_id
+			},
+			'message_data': {
+				'text': text
+			}
+		}
+	}
+	r = twitter.post(url, json=event)
+	print(r.text)
+
+
+def process_event(event):
+	dme = event['direct_message_events'][0]
+	if dme['type'] == 'message_create':
+		if dme['message_create']['target']['recipient_id'] == '1215156392673169408':
+			message = dme['message_create']['message_data']['text']
+			recipient_id = dme['message_create']['sender_id']
+			send_dm(message, recipient_id=)
+
+def start_autohook():
+	proc = subprocess.Popen(['/bin/bash','autohook.sh'],stdout=subprocess.PIPE,text=True)
+	line = ''
+	cnt = 0
+	while 'Subscribed' not in line and cnt < 10:
+		line = str(proc.stdout.readline())
+		print(line)
+		cnt+=1
+
+	buff = ''
+	while True:
+		line = proc.stdout.readline()
+		if not line:
+			break
+		buff += line
+		try:
+			event = json.loads(buff)
+			buff = ''
+			process_event(event)
+		except json.JSONDecodeError:
+			continue
 
 
 
