@@ -10,8 +10,42 @@ from bs4 import BeautifulSoup
 from requests_oauthlib import OAuth1Session
 from flask import Flask
 from flask import request
+import subprocess
+import sys
+from json_stream_parser import load_iter
 
 
+def process_event(event):
+    print(event)
+
+proc = subprocess.Popen(['/bin/bash','autohook.sh'],stdout=subprocess.PIPE,text=True)
+line = ''
+cnt = 0
+while 'Subscribed' not in line and cnt < 10:
+    line = str(proc.stdout.readline())
+    print(line)
+    cnt+=1
+
+buff = ''
+while True:
+    line = proc.stdout.readline()
+    if not line:
+        break
+    buff += line
+
+    try:
+        event = json.loads(buff)
+        buff = ''
+        process_event(event)
+    except json.JSONDecodeError:
+        continue
+
+#while True:  
+    #    line = proc.stdout.readline()
+#    if not line:
+#        break
+#    #the real code does filtering here
+#    print("test:", line.rstrip())
 
 app = Flask(__name__)
 config = configparser.ConfigParser()
