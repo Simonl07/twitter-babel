@@ -33,16 +33,16 @@ twitter = OAuth1Session(
 def send_dm(text, recipient_id):
 	url = 'https://api.twitter.com/1.1/direct_messages/events/new.json'
 	event = {
-                'event': {
-		        'type': 'message_create',
-		        'message_create': {
-			        'target': {
-				        'recipient_id': recipient_id
-			        },
-			        'message_data': {
-				        'text': text
-			        }
-                        }
+		'event': {
+			'type': 'message_create',
+			'message_create': {
+				'target': {
+					'recipient_id': recipient_id
+				},
+				'message_data': {
+					'text': text
+				}
+			}
 		}
 	}
 	r = twitter.post(url, json=event)
@@ -50,18 +50,18 @@ def send_dm(text, recipient_id):
 
 
 def process_event(event):
-    print(f'received event: {event}')
-    if 'direct_message_events' in event and len(event['direct_message_events']) > 0:
-        dme = event['direct_message_events'][0]
-        if dme['type'] == 'message_create':
-            if dme['message_create']['target']['recipient_id'] == '1215156392673169408':
-                message = dme['message_create']['message_data']['text']
-                recipient_id = dme['message_create']['sender_id']
-                print('sending dm: ' + message)
-                send_dm(message, recipient_id)
-            
+	if 'direct_message_events' in event and len(event['direct_message_events']) > 0:
+		dme = event['direct_message_events'][0]
+		if dme['type'] == 'message_create':
+			if dme['message_create']['target']['recipient_id'] == '1215156392673169408':
+				message = dme['message_create']['message_data']['text']
+				recipient_id = dme['message_create']['sender_id']
+				print(f'received from {recipient_id}: {message}')
+				response = babel(message)
+				send_dm(response, recipient_id)
 
-    
+
+
 def start_autohook():
 	proc = subprocess.Popen(['/bin/bash','autohook.sh'],stdout=subprocess.PIPE,text=True)
 	line = ''
@@ -124,7 +124,18 @@ def babel(text):
 	r = requests.post(book_marker_url,data=book_marker_payload, headers=headers)
 	url = r.url
 
-	print(f'The text "{text}" is found on page {page} of the book "{title}", which is the {ord(volume)} volume that sits on the {ord(shelf)} shelf of the {ord(wall)} wall in room {room}, link to this page: \n {url}')
+	# return {
+	# 	'full_room_hex': full_room_hex,
+	# 	'title': title,
+	# 	'room': room,
+	# 	'wall': wall,
+	# 	'shelf': shelf,
+	# 	'volume': volume,
+	# 	'page': page,
+	# 	'url': url
+	# }
+
+	return f'The text "{text}" is found on page {page} of the book "{title}", which is the {ord(volume)} volume that sits on the {ord(shelf)} shelf of the {ord(wall)} wall in room {room}, link to this page: \n {url}')
 
 
 
