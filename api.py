@@ -29,6 +29,59 @@ twitter = OAuth1Session(
 			resource_owner_secret=config['DEFAULT']['resource_owner_secret']
 		)
 
+def babel(text):
+	regex = r"(?P<room>.+?)-w(?P<wall>\d+?)-s(?P<shelf>\d+?)-v(?P<volume>\d+?)$"
+	full_room_regex = "postform\('(.+?)'.+?\)"
+
+	url = "https://libraryofbabel.info/search.cgi"
+	data = {'find': text, 'btnSubmit': 'Search', 'method': 'x'}
+	r = requests.post(url, data=data)
+	soup = BeautifulSoup(r.text, features="html.parser")
+	exact_match = soup.find_all('div', class_='location')[0].pre
+	title = exact_match.find_all('b')[0].get_text()
+
+	location_str = exact_match.a.get_text()
+	full_room_hex = re.search(full_room_regex, exact_match.a.get('onclick')).group(1)
+	m = re.search(regex, location_str)
+
+	room = m.group('room')
+	wall = int(m.group('wall'))
+	shelf = int(m.group('shelf'))
+	volume = int(m.group('volume'))
+	page = int(exact_match.find_all('b')[1].get_text())
+
+	book_marker_url = "https://libraryofbabel.info/bookmarker.cgi"
+	book_marker_payload = {
+		'hex': full_room_hex,
+		'wall': wall,
+		'shelf': shelf,
+		'volume': m.group('volume'),
+		'page': page,
+		'title': title + str(page)
+	}
+
+	headers = {
+		'referer': 'https://libraryofbabel.info/book.cgi',
+	}
+
+	r = requests.post(book_marker_url,data=book_marker_payload, headers=headers)
+	url = r.url
+
+	# return {
+	# 	'full_room_hex': full_room_hex,
+	# 	'title': title,
+	# 	'room': room,
+	# 	'wall': wall,
+	# 	'shelf': shelf,
+	# 	'volume': volume,
+	# 	'page': page,
+	# 	'url': url
+	# }
+
+	return f'The text "{text}" is found on page {page} of the book "{title}", which is the {ord(volume)} volume that sits on the {ord(shelf)} shelf of the {ord(wall)} wall in room {room}, link to this page: \n {url}'
+
+
+
 
 def send_dm(text, recipient_id):
 	url = 'https://api.twitter.com/1.1/direct_messages/events/new.json'
@@ -85,57 +138,6 @@ def start_autohook():
 			continue
 
 start_autohook()
-
-def babel(text):
-	regex = r"(?P<room>.+?)-w(?P<wall>\d+?)-s(?P<shelf>\d+?)-v(?P<volume>\d+?)$"
-	full_room_regex = "postform\('(.+?)'.+?\)"
-
-	url = "https://libraryofbabel.info/search.cgi"
-	data = {'find': text, 'btnSubmit': 'Search', 'method': 'x'}
-	r = requests.post(url, data=data)
-	soup = BeautifulSoup(r.text, features="html.parser")
-	exact_match = soup.find_all('div', class_='location')[0].pre
-	title = exact_match.find_all('b')[0].get_text()
-
-	location_str = exact_match.a.get_text()
-	full_room_hex = re.search(full_room_regex, exact_match.a.get('onclick')).group(1)
-	m = re.search(regex, location_str)
-
-	room = m.group('room')
-	wall = int(m.group('wall'))
-	shelf = int(m.group('shelf'))
-	volume = int(m.group('volume'))
-	page = int(exact_match.find_all('b')[1].get_text())
-
-	book_marker_url = "https://libraryofbabel.info/bookmarker.cgi"
-	book_marker_payload = {
-		'hex': full_room_hex,
-		'wall': wall,
-		'shelf': shelf,
-		'volume': m.group('volume'),
-		'page': page,
-		'title': title + str(page)
-	}
-
-	headers = {
-		'referer': 'https://libraryofbabel.info/book.cgi',
-	}
-
-	r = requests.post(book_marker_url,data=book_marker_payload, headers=headers)
-	url = r.url
-
-	# return {
-	# 	'full_room_hex': full_room_hex,
-	# 	'title': title,
-	# 	'room': room,
-	# 	'wall': wall,
-	# 	'shelf': shelf,
-	# 	'volume': volume,
-	# 	'page': page,
-	# 	'url': url
-	# }
-
-	return f'The text "{text}" is found on page {page} of the book "{title}", which is the {ord(volume)} volume that sits on the {ord(shelf)} shelf of the {ord(wall)} wall in room {room}, link to this page: \n {url}'
 
 
 
