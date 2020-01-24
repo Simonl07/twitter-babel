@@ -7,12 +7,15 @@ import hashlib
 import hmac
 import json
 import time
+import threading
 from bs4 import BeautifulSoup
 from requests_oauthlib import OAuth1Session
 from flask import Flask
 from flask import request
 import subprocess
 import sys
+from multiprocessing import Pool
+
 
 app = Flask(__name__)
 config = configparser.ConfigParser()
@@ -77,8 +80,8 @@ def babel(text):
 	# 	'page': page,
 	# 	'url': url
 	# }
-
-	return f'The text "{text}" is found on page {page} of the book "{title}", which is the {ord(volume)} volume that sits on the {ord(shelf)} shelf of the {ord(wall)} wall in room {room}, link to this page: \n {url}'
+	return f'This text is found on page {page} of the book "{title}", the {ord(volume)} volume that sits on the {ord(shelf)} shelf of the {ord(wall)} wall in room {room}: {url}'
+	# return f'"{text}" is found on page {page} of the book "{title}", the {ord(volume)} volume that sits on the {ord(shelf)} shelf of the {ord(wall)} wall in room {room}, link to this page: \n {url}'
 
 
 
@@ -153,33 +156,45 @@ def reply_tweet(content, user_screen_name, status_id):
 	}
 
 	r = twitter.post(url, params=params)
+	print(r.json())
 
 
 def process_mentions():
-	url = 'https://api.twitter.com/1.1/statuses/mentions_timeline.json?'
+	while True:
+		url = 'https://api.twitter.com/1.1/statuses/mentions_timeline.json?'
 
-	with open('.last_mention', 'r+') as f:
-		since_id = f.readline()
+		with open('.last_mention') as f:
+			since_id = f.readline()
+
+		print(since_id)
+
 		if since_id:
 			r = twitter.get(url, params={'since_id': since_id})
 		else:
 			r = twitter.get(url)
 
 		mentions = r.json()
+		print(mentions)
+		if len(mentions) >= 1:
+			since_id = mentions[0]['id']
 		for mention in mentions:
 			id = mention['id']
-			user_screen_name = mention['user']['screen_name']
-			print(get_tweet(mention['in_reply_to_status_id']))
-			original_text = get_tweet(mention['in_reply_to_status_id'])['text']
-			babeled = babel(original_text)
-			reply_tweet(babeled, user_screen_name, id)
-			since_id = id
+			if mention['in_reply_to_status_id']:
+				print(mention['in_reply_to_status_id'])
+				# print('working on mention: ' + str(mention))
+				user_screen_name = mention['user']['screen_name']
+				original_text = get_tweet(mention['in_reply_to_status_id'])['text']
+				babeled = babel(original_text)
+				print(len(babeled))
+				reply_tweet(babeled, user_screen_name, id)
 
-		f.write(since_id)
+		with open('.last_mention', 'w') as f:
+			f.write(str(since_id))
 
-while True:
-	process_mentions()
-	time.sleep(1)
+		time.sleep(2)
+
+
+
 
 
 def tweet(params):
@@ -203,9 +218,19 @@ def dm_default_welcome_message(message):
 	r = twitter.post(url, json=rule)
 
 
-babel('hello world abcde')
-#
-print("starting babel-bot instance")
-app.run(host='0.0.0.0', port=80)
+mentions_thread = threading.Thread(target=process_mentions)
+mentions_thread.daemon = True
+mentions_thread.start()
+
+start_autohook()
+
+
+
+
+
+# babel('hello world abcde')
+# #
+# print("starting babel-bot instance")
+# app.run(host='0.0.0.0', port=80)
 # dm_default_welcome_message("Welcome!")
 # tweet({"status": "hello world3 attachment_url", "attachment_url": "https://twitter.com/andypiper/status/903615884664725505"})
