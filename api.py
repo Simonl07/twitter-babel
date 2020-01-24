@@ -12,7 +12,6 @@ from flask import Flask
 from flask import request
 import subprocess
 import sys
-from json_stream_parser import load_iter
 
 app = Flask(__name__)
 config = configparser.ConfigParser()
@@ -136,10 +135,48 @@ def start_autohook():
 			process_event(event)
 		except json.JSONDecodeError:
 			continue
+#
+# start_autohook()
 
-start_autohook()
+def get_tweet(id):
+	url = 'https://api.twitter.com/1.1/statuses/show.json'
+	r = twitter.get(url, params={'id': id})
+	return r.json()
 
 
+def reply_tweet(content, user_screen_name, status_id):
+	url = 'https://api.twitter.com/1.1/statuses/update.json'
+	params = {
+		'status': f'@{user_screen_name} {content}',
+		'in_reply_to_status_id': status_id
+	}
+
+	r = twitter.post(url, params=params)
+
+reply_tweet()
+
+def get_mentions():
+	url = 'https://api.twitter.com/1.1/statuses/mentions_timeline.json?'
+
+	with open('.last_mention', 'r+') as f:
+		since_id = f.readline()
+		if since_id:
+			r = twitter.get(url, params={'since_id': since_id})
+		else:
+			r = twitter.get(url)
+
+		mentions = r.json()
+		for mention in mentions:
+			id = mention['id']
+			user_screen_name = mention['user']['screen_name']
+			original_text = get_tweet(mention['in_reply_to_status_id'])['text']
+			babeled = babel(original_text)
+			reply_tweet(babeled, user_screen_name, id)
+			since_id = id
+
+		f.write(since_id)
+
+get_mentions()
 
 
 def tweet(params):
