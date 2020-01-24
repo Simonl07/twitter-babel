@@ -80,7 +80,7 @@ def babel(text):
 	# 	'page': page,
 	# 	'url': url
 	# }
-	return f'This text is found on page {page} of the book "{title}", the {ord(volume)} volume that sits on the {ord(shelf)} shelf of the {ord(wall)} wall in room {room}: {url}'
+	return f'This text is found on page {page} of the book "{title}", which is the {ord(volume)} volume that sits on the {ord(shelf)} shelf of the {ord(wall)} wall in room {room}: {url}'
 	# return f'"{text}" is found on page {page} of the book "{title}", the {ord(volume)} volume that sits on the {ord(shelf)} shelf of the {ord(wall)} wall in room {room}, link to this page: \n {url}'
 
 
