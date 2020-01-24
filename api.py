@@ -6,6 +6,7 @@ import base64
 import hashlib
 import hmac
 import json
+import time
 from bs4 import BeautifulSoup
 from requests_oauthlib import OAuth1Session
 from flask import Flask
@@ -153,9 +154,8 @@ def reply_tweet(content, user_screen_name, status_id):
 
 	r = twitter.post(url, params=params)
 
-reply_tweet()
 
-def get_mentions():
+def process_mentions():
 	url = 'https://api.twitter.com/1.1/statuses/mentions_timeline.json?'
 
 	with open('.last_mention', 'r+') as f:
@@ -176,7 +176,9 @@ def get_mentions():
 
 		f.write(since_id)
 
-get_mentions()
+while True:
+	process_mentions()
+	time.sleep(1)
 
 
 def tweet(params):
