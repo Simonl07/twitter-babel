@@ -169,6 +169,7 @@ def process_mentions():
 		for mention in mentions:
 			id = mention['id']
 			user_screen_name = mention['user']['screen_name']
+			print(get_tweet(mention['in_reply_to_status_id']))
 			original_text = get_tweet(mention['in_reply_to_status_id'])['text']
 			babeled = babel(original_text)
 			reply_tweet(babeled, user_screen_name, id)
