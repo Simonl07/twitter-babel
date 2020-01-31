@@ -23,6 +23,8 @@ config.read('credentials.ini')
 ord = inflect.engine().ordinal
 
 
+reply_maps = {}
+
 bio = "The babel librarian of Twitter. Unraveling the location of tweets around the world and the messages of curious visitors."
 
 twitter = OAuth1Session(
@@ -70,18 +72,7 @@ def babel(text):
 	r = requests.post(book_marker_url,data=book_marker_payload, headers=headers)
 	url = r.url
 
-	# return {
-	# 	'full_room_hex': full_room_hex,
-	# 	'title': title,
-	# 	'room': room,
-	# 	'wall': wall,
-	# 	'shelf': shelf,
-	# 	'volume': volume,
-	# 	'page': page,
-	# 	'url': url
-	# }
 	return f'This text is found on page {page} of the book "{title}", which is the {ord(volume)} volume that sits on the {ord(shelf)} shelf of the {ord(wall)} wall in room {room}: {url}'
-	# return f'"{text}" is found on page {page} of the book "{title}", the {ord(volume)} volume that sits on the {ord(shelf)} shelf of the {ord(wall)} wall in room {room}, link to this page: \n {url}'
 
 
 
@@ -102,7 +93,8 @@ def send_dm(text, recipient_id):
 		}
 	}
 	r = twitter.post(url, json=event)
-	print(r.text)
+	if r.status_code is not 200:
+		print(f'dm failed: {r.text}')
 
 
 def process_event(event):
@@ -116,15 +108,12 @@ def process_event(event):
 				response = babel(message)
 				send_dm(response, recipient_id)
 
-
-
 def start_autohook():
 	proc = subprocess.Popen(['/bin/bash','autohook.sh'],stdout=subprocess.PIPE,text=True)
 	line = ''
 	cnt = 0
 	while 'Subscribed' not in line and cnt < 10:
 		line = str(proc.stdout.readline())
-		print(line)
 		cnt+=1
 
 	buff = ''
@@ -156,7 +145,31 @@ def reply_tweet(content, user_screen_name, status_id):
 	}
 
 	r = twitter.post(url, params=params)
-	print(r.json())
+	# print(r.json())
+
+
+def retweet(id):
+	tweet = get_tweet(id)
+	original_text = tweet['text']
+	babeled = babel(original_text)
+
+	status = {
+		"status": babeled,
+		"attachment_url": tweet['entities']['urls'][0]['expanded_url']
+	}
+	tweet(status)
+
+
+
+def start_retweeting():
+	while True:
+		if len(reply_maps) > 0:
+			tweet_id = max(reply_maps, key=lambda x: reply_maps[x])
+			print(f'retweeting the most popular tweet at {datetime.datetime.now()}: {tweet_id}')
+			retweet(id)
+
+			# sleep for 5 hrs
+		time.sleep(5 * 3600)
 
 
 def process_mentions():
@@ -166,27 +179,30 @@ def process_mentions():
 		with open('.last_mention') as f:
 			since_id = f.readline()
 
-		print(since_id)
-
 		if since_id:
 			r = twitter.get(url, params={'since_id': since_id})
 		else:
 			r = twitter.get(url)
 
 		mentions = r.json()
-		print(mentions)
+		# print(mentions)
 		if len(mentions) >= 1:
 			since_id = mentions[0]['id']
 		for mention in mentions:
 			id = mention['id']
 			if mention['in_reply_to_status_id']:
-				print(mention['in_reply_to_status_id'])
-				# print('working on mention: ' + str(mention))
 				user_screen_name = mention['user']['screen_name']
+				# Override myself
+				if user_screen_name == 'Simonl07':
+					retweet(mention['in_reply_to_status_id'])
 				original_text = get_tweet(mention['in_reply_to_status_id'])['text']
 				babeled = babel(original_text)
-				print(len(babeled))
 				reply_tweet(babeled, user_screen_name, id)
+
+				# update response map
+				if mention['in_reply_to_status_id'] not in reply_maps:
+					reply_maps[mention['in_reply_to_status_id']] = 1
+				reply_maps[mention['in_reply_to_status_id']]
 
 		with open('.last_mention', 'w') as f:
 			f.write(str(since_id))
@@ -195,12 +211,9 @@ def process_mentions():
 
 
 
-
-
 def tweet(params):
 	url = "https://api.twitter.com/1.1/statuses/update.json"
 	r = twitter.post(url, params=params)
-	print(r.text)
 
 def dm_default_welcome_message(message):
 	url = "https://api.twitter.com/1.1/direct_messages/welcome_messages/new.json"
@@ -222,15 +235,8 @@ mentions_thread = threading.Thread(target=process_mentions)
 mentions_thread.daemon = True
 mentions_thread.start()
 
+retweet_thread = threading.Thread(target=start_retweeting)
+retweet_thread.daemon = True
+retweet_thread.start()
+
 start_autohook()
-
-
-
-
-
-# babel('hello world abcde')
-# #
-# print("starting babel-bot instance")
-# app.run(host='0.0.0.0', port=80)
-# dm_default_welcome_message("Welcome!")
-# tweet({"status": "hello world3 attachment_url", "attachment_url": "https://twitter.com/andypiper/status/903615884664725505"})
