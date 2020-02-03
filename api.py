@@ -22,10 +22,7 @@ config = configparser.ConfigParser()
 config.read('credentials.ini')
 ord = inflect.engine().ordinal
 
-
 reply_maps = {}
-
-bio = "The babel librarian of Twitter. Unraveling the location of tweets around the world and the messages of curious visitors."
 
 twitter = OAuth1Session(
 			config['DEFAULT']['oauth_consumer_key'],
@@ -72,7 +69,7 @@ def babel(text):
 	r = requests.post(book_marker_url,data=book_marker_payload, headers=headers)
 	url = r.url
 
-	return f'This text is found on page {page} of the book "{title}", which is the {ord(volume)} volume that sits on the {ord(shelf)} shelf of the {ord(wall)} wall in room {room}: {url}'
+	return f'This text is found on page {page} of the book "{title}" -- the {ord(volume)} volume that sits on the {ord(shelf)} shelf of the {ord(wall)} wall in room {room}: {url}'
 
 
 
@@ -97,16 +94,12 @@ def send_dm(text, recipient_id):
 		print(f'dm failed: {r.text}')
 
 
-def process_event(event):
-	if 'direct_message_events' in event and len(event['direct_message_events']) > 0:
-		dme = event['direct_message_events'][0]
-		if dme['type'] == 'message_create':
-			if dme['message_create']['target']['recipient_id'] == '1215156392673169408':
-				message = dme['message_create']['message_data']['text']
-				recipient_id = dme['message_create']['sender_id']
-				print(f'received from {recipient_id}: {message}')
-				response = babel(message)
-				send_dm(response, recipient_id)
+def process_dm_event(dme):
+	message = dme['message_create']['message_data']['text']
+	recipient_id = dme['message_create']['sender_id']
+	print(f'received from {recipient_id}: {message}')
+	response = babel(message)
+	send_dm(response, recipient_id)
 
 def start_autohook():
 	proc = subprocess.Popen(['/bin/bash','autohook.sh'],stdout=subprocess.PIPE,text=True)
@@ -125,7 +118,13 @@ def start_autohook():
 		try:
 			event = json.loads(buff)
 			buff = ''
-			process_event(event)
+			if 'direct_message_events' in event and len(event['direct_message_events']) > 0:
+				dme = event['direct_message_events'][0]
+				if dme['type'] == 'message_create':
+					if dme['message_create']['target']['recipient_id'] == '1215156392673169408':
+						dm_thread = threading.Thread(target=process_dm_event, args=(dme,))
+						dm_thread.daemon = True
+						dm_thread.start()
 		except json.JSONDecodeError:
 			continue
 #
@@ -133,7 +132,7 @@ def start_autohook():
 
 def get_tweet(id):
 	url = 'https://api.twitter.com/1.1/statuses/show.json'
-	r = twitter.get(url, params={'id': id})
+	r = twitter.get(url, params={'id': id, 'tweet_mode': 'extended'})
 	return r.json()
 
 
@@ -149,13 +148,17 @@ def reply_tweet(content, user_screen_name, status_id):
 
 
 def retweet(id):
-	tweet = get_tweet(id)
-	original_text = tweet['text']
+	print(f'retweeting: {id}')
+	t = get_tweet(id)
+	original_text = t['full_text']
 	babeled = babel(original_text)
 
+	attachment_url = f"https://www.twitter.com/{t['user']['screen_name']}/status/{t['id']}"
+
+	print(attachment_url)
 	status = {
 		"status": babeled,
-		"attachment_url": tweet['entities']['urls'][0]['expanded_url']
+		"attachment_url": attachment_url
 	}
 	tweet(status)
 
@@ -174,6 +177,7 @@ def start_retweeting():
 
 def process_mentions():
 	while True:
+		print('checking mentions...')
 		url = 'https://api.twitter.com/1.1/statuses/mentions_timeline.json?'
 
 		with open('.last_mention') as f:
@@ -184,18 +188,27 @@ def process_mentions():
 		else:
 			r = twitter.get(url)
 
+
 		mentions = r.json()
-		# print(mentions)
-		if len(mentions) >= 1:
+		if 'errors' in mentions:
+			print(mentions)
+		elif len(mentions) > 0:
+			print(mentions)
 			since_id = mentions[0]['id']
+
 		for mention in mentions:
 			id = mention['id']
 			if mention['in_reply_to_status_id']:
 				user_screen_name = mention['user']['screen_name']
+
 				# Override myself
-				if user_screen_name == 'Simonl07':
-					retweet(mention['in_reply_to_status_id'])
-				original_text = get_tweet(mention['in_reply_to_status_id'])['text']
+				print(user_screen_name)
+				if user_screen_name == 'Simonl2507':
+					dm_thread = threading.Thread(target=retweet, args=(mention['in_reply_to_status_id',))
+					dm_thread.daemon = True
+					dm_thread.start()
+
+				original_text = get_tweet(mention['in_reply_to_status_id'])['full_text']
 				babeled = babel(original_text)
 				reply_tweet(babeled, user_screen_name, id)
 
@@ -207,13 +220,14 @@ def process_mentions():
 		with open('.last_mention', 'w') as f:
 			f.write(str(since_id))
 
-		time.sleep(2)
+		time.sleep(12)
 
 
 
 def tweet(params):
 	url = "https://api.twitter.com/1.1/statuses/update.json"
 	r = twitter.post(url, params=params)
+	print(r.text)
 
 def dm_default_welcome_message(message):
 	url = "https://api.twitter.com/1.1/direct_messages/welcome_messages/new.json"
@@ -239,4 +253,6 @@ retweet_thread = threading.Thread(target=start_retweeting)
 retweet_thread.daemon = True
 retweet_thread.start()
 
-start_autohook()
+retweet_thread.join()
+
+# start_autohook()
