@@ -109,6 +109,7 @@ def start_autohook():
 		line = str(proc.stdout.readline())
 		cnt+=1
 
+	print('listenting for dms..')
 	buff = ''
 	while True:
 		line = proc.stdout.readline()
@@ -122,13 +123,12 @@ def start_autohook():
 				dme = event['direct_message_events'][0]
 				if dme['type'] == 'message_create':
 					if dme['message_create']['target']['recipient_id'] == '1215156392673169408':
+						print(f'received dm: {dme}')
 						dm_thread = threading.Thread(target=process_dm_event, args=(dme,))
 						dm_thread.daemon = True
 						dm_thread.start()
 		except json.JSONDecodeError:
 			continue
-#
-# start_autohook()
 
 def get_tweet(id):
 	url = 'https://api.twitter.com/1.1/statuses/show.json'
@@ -257,7 +257,5 @@ mentions_thread.start()
 retweet_thread = threading.Thread(target=start_retweeting)
 retweet_thread.daemon = True
 retweet_thread.start()
-
-retweet_thread.join()
 
 start_autohook()
