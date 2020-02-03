@@ -98,7 +98,10 @@ def process_dm_event(dme):
 	message = dme['message_create']['message_data']['text']
 	recipient_id = dme['message_create']['sender_id']
 	print(f'received from {recipient_id}: {message}')
-	response = babel(message)
+	if len(message) > 3000:
+		response = 'Cannot support messages longer than 3000 characters..'
+	else:
+		response = babel(message)
 	send_dm(response, recipient_id)
 
 def start_autohook():
@@ -185,7 +188,7 @@ def process_mention(mention):
 		babeled = babel(original_text)
 		reply_tweet(babeled, user_screen_name, id)
 
-		if user_screen_name == 'Simonl2507':
+		if user_screen_name in ['Simonl2507', 'jonothingEB']:
 			dm_thread = threading.Thread(target=retweet, args=(mention['in_reply_to_status_id'],))
 			dm_thread.daemon = True
 			dm_thread.start()
@@ -248,14 +251,17 @@ def dm_default_welcome_message(message):
 	rule = {"welcome_message_rule": {"welcome_message_id": r.json()['welcome_message']['id']}}
 	url = "https://api.twitter.com/1.1/direct_messages/welcome_messages/rules/new.json"
 	r = twitter.post(url, json=rule)
+	print(r.text)
 
 
-mentions_thread = threading.Thread(target=listen_mentions)
-mentions_thread.daemon = True
-mentions_thread.start()
+# mentions_thread = threading.Thread(target=listen_mentions)
+# mentions_thread.daemon = True
+# mentions_thread.start()
+#
+# retweet_thread = threading.Thread(target=start_retweeting)
+# retweet_thread.daemon = True
+# retweet_thread.start()
+#
+# start_autohook()
 
-retweet_thread = threading.Thread(target=start_retweeting)
-retweet_thread.daemon = True
-retweet_thread.start()
-
-start_autohook()
+dm_default_welcome_message('Send me any text and I will show you where it is in The Library of Babel: https://libraryofbabel.info/')
