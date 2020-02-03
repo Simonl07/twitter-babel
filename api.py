@@ -175,7 +175,27 @@ def start_retweeting():
 		time.sleep(5 * 3600)
 
 
-def process_mentions():
+def process_mention(mention):
+	id = mention['id']
+	if mention['in_reply_to_status_id']:
+		user_screen_name = mention['user']['screen_name']
+		# Override myself
+
+		original_text = get_tweet(mention['in_reply_to_status_id'])['full_text']
+		babeled = babel(original_text)
+		reply_tweet(babeled, user_screen_name, id)
+
+		if user_screen_name == 'Simonl2507':
+			dm_thread = threading.Thread(target=retweet, args=(mention['in_reply_to_status_id'],))
+			dm_thread.daemon = True
+			dm_thread.start()
+
+		# update response map
+		if mention['in_reply_to_status_id'] not in reply_maps:
+			reply_maps[mention['in_reply_to_status_id']] = 1
+		reply_maps[mention['in_reply_to_status_id']] += 1
+
+def listen_mentions():
 	while True:
 		print('checking mentions...')
 		url = 'https://api.twitter.com/1.1/statuses/mentions_timeline.json?'
@@ -192,30 +212,16 @@ def process_mentions():
 		mentions = r.json()
 		if 'errors' in mentions:
 			print(mentions)
+			continue
 		elif len(mentions) > 0:
 			print(mentions)
 			since_id = mentions[0]['id']
 
 		for mention in mentions:
-			id = mention['id']
-			if mention['in_reply_to_status_id']:
-				user_screen_name = mention['user']['screen_name']
+			mention_thread = threading.Thread(target=process_mention, args=(mention,))
+			mention_thread.daemon = True
+			mention_thread.start()
 
-				# Override myself
-				print(user_screen_name)
-				if user_screen_name == 'Simonl2507':
-					dm_thread = threading.Thread(target=retweet, args=(mention['in_reply_to_status_id',))
-					dm_thread.daemon = True
-					dm_thread.start()
-
-				original_text = get_tweet(mention['in_reply_to_status_id'])['full_text']
-				babeled = babel(original_text)
-				reply_tweet(babeled, user_screen_name, id)
-
-				# update response map
-				if mention['in_reply_to_status_id'] not in reply_maps:
-					reply_maps[mention['in_reply_to_status_id']] = 1
-				reply_maps[mention['in_reply_to_status_id']]
 
 		with open('.last_mention', 'w') as f:
 			f.write(str(since_id))
@@ -238,14 +244,13 @@ def dm_default_welcome_message(message):
 				}
 			}
 	r = twitter.post(url, json=body)
-	print(r.json()['welcome_message']['id'])
 
 	rule = {"welcome_message_rule": {"welcome_message_id": r.json()['welcome_message']['id']}}
 	url = "https://api.twitter.com/1.1/direct_messages/welcome_messages/rules/new.json"
 	r = twitter.post(url, json=rule)
 
 
-mentions_thread = threading.Thread(target=process_mentions)
+mentions_thread = threading.Thread(target=listen_mentions)
 mentions_thread.daemon = True
 mentions_thread.start()
 
@@ -255,4 +260,4 @@ retweet_thread.start()
 
 retweet_thread.join()
 
-# start_autohook()
+start_autohook()
