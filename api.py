@@ -188,7 +188,7 @@ def process_mention(mention):
 		babeled = babel(original_text)
 		reply_tweet(babeled, user_screen_name, id)
 
-		if user_screen_name in ['Simonl2507', 'jonothingEB']:
+		if user_screen_name in ['simonlu07', 'jonothingEB']:
 			dm_thread = threading.Thread(target=retweet, args=(mention['in_reply_to_status_id'],))
 			dm_thread.daemon = True
 			dm_thread.start()
@@ -229,7 +229,7 @@ def listen_mentions():
 		with open('.last_mention', 'w') as f:
 			f.write(str(since_id))
 
-		time.sleep(12)
+		time.sleep(15)
 
 
 
@@ -254,14 +254,14 @@ def dm_default_welcome_message(message):
 	print(r.text)
 
 
-# mentions_thread = threading.Thread(target=listen_mentions)
-# mentions_thread.daemon = True
-# mentions_thread.start()
-#
-# retweet_thread = threading.Thread(target=start_retweeting)
-# retweet_thread.daemon = True
-# retweet_thread.start()
-#
-# start_autohook()
+mentions_thread = threading.Thread(target=listen_mentions)
+mentions_thread.daemon = True
+mentions_thread.start()
 
-dm_default_welcome_message('Send me any text and I will show you where it is in The Library of Babel: https://libraryofbabel.info/')
+retweet_thread = threading.Thread(target=start_retweeting)
+retweet_thread.daemon = True
+retweet_thread.start()
+
+start_autohook()
+
+# dm_default_welcome_message('Send me any text and I will show you where it is in The Library of Babel: https://libraryofbabel.info/')
